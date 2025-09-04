@@ -1,0 +1,70 @@
+-- Create users roles with passwords
+CREATE ROLE admin_user WITH PASSWORD 'SecureAdmin123';
+CREATE ROLE data_engineer_user WITH PASSWORD 'SecureEngineer123';
+CREATE ROLE data_analyst_user WITH PASSWORD 'SecureAnalyst123';
+CREATE ROLE ml_engineer_user WITH PASSWORD 'SecureML123';
+
+-- Assign each login user to their respective group role
+GRANT admin TO admin_user;
+GRANT data_engineer TO data_engineer_user;
+GRANT data_analyst TO data_analyst_user;
+GRANT ml_engineer TO ml_engineer_user;
+
+-- To check if users have been created
+SELECT * FROM pg_catalog.pg_roles;
+
+-- Better still,to view only login roles (actual users)
+SELECT rolname FROM pg_catalog.pg_roles WHERE rolcanlogin = true;
+
+-- lists only custom roles (e.g., the ones i created for this project)
+SELECT rolname
+FROM pg_roles
+WHERE rolcanlogin = true
+  AND rolname NOT IN ('postgres','researcher', 'pg_signal_backend', 'pg_read_all_data', 
+                      'pg_write_all_data', 'pg_read_all_settings', 
+                      'pg_monitor', 'pg_database_owner', 'pg_read_server_files', 
+                      'pg_write_server_files', 'pg_execute_server_program', 
+                      'pg_backup', 'pg_checkpointer', 'pg_stat_scan_tables');
+
+
+-- Grant Permissions to admin
+-- Grant all privileges and role management to admin
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin;
+GRANT CREATE, USAGE ON SCHEMA public TO admin;
+ALTER ROLE admin WITH CREATEROLE CREATEDB;
+
+-- Grant Permissions to data_engineer
+-- Basic table access
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO data_engineer;
+-- Allow schema evolution
+GRANT CREATE, USAGE ON SCHEMA public TO data_engineer;
+-- Access to sequences (needed for SERIAL or identity columns)
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO data_engineer;
+
+-- Grant Permissions to data_analyst
+-- Read-only access
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO data_analyst;
+-- Allow reading from sequences 
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO data_analyst;
+
+-- Grant Permissions to ml_engineer
+-- Read access to required tables
+GRANT SELECT ON users, stocks, stock_prices, transactions TO ml_engineer;
+
+-- Allow creation of new tables ( for example predicted_prices)
+GRANT CREATE ON SCHEMA public TO ml_engineer;
+
+-- Create table for storing ML model predictions
+CREATE TABLE predicted_prices (
+    prediction_id SERIAL PRIMARY KEY,
+    stock_id INTEGER NOT NULL REFERENCES stocks(stock_id),
+    predicted_price DECIMAL(10, 2) NOT NULL,
+    prediction_date DATE NOT NULL,
+    model_version VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Grant INSERT/UPDATE on ML-specific table(Predicted_prices)
+GRANT INSERT, UPDATE,SELECT,DELETE ON predicted_prices TO ml_engineer;
+
